@@ -114,6 +114,7 @@ public class DonServices extends BaseServices<DonEntity, Long> {
         LocalDateTime currentDate = LocalDateTime.now();
         donation.setDonationDate(currentDate);
         donation.setStartDonation(currentDate);
+        donation.setAmount(donation.getAmount() + 1);
         donation.setConfirmDonateReqId(dto.getRequestId());
 
         // Save entities
@@ -162,6 +163,7 @@ public class DonServices extends BaseServices<DonEntity, Long> {
         donation.setStatus(DonStatus.VALID);
         donation.setDonationDate(null);
         donation.setStartDonation(null);
+        donation.setAmount(donation.getAmount() - 1);
         donation.setConfirmDonateReqId(0L);
 
         donRepository.save(donation);
