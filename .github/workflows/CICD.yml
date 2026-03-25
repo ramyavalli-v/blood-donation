@@ -1,170 +1,117 @@
-name: Build, Test, and Deploy Nuqta
+name: Build, Test, and Deploy Nuqta to AWS EKS
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
+
   build:
-    name: Build and Test
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: "17"
+          distribution: "temurin"
 
-      - name: Cache Maven packages
+      - name: Cache Maven repository
         uses: actions/cache@v3
         with:
           path: ~/.m2
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
 
-      - name: Build and Test with Maven
+      - name: Build & Test
         run: mvn clean verify
 
-      - name: Package Application
+      - name: Package app
         run: mvn package -DskipTests
 
-      - name: Upload JAR artifact
+      - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
           name: app-jar
           path: target/*.jar
           retention-days: 1
 
+
   deploy:
-    name: Deploy to Heroku
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    environment: production
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Download JAR artifact
+      - name: Download JAR
         uses: actions/download-artifact@v4
         with:
           name: app-jar
           path: target
 
-      - name: Create necessary files for Heroku
-        run: |
-          # Create system.properties file for Java version
-          echo "java.runtime.version=17" > system.properties
-          
-          # Create Procfile with proper preview flag
-          echo "web: java -Dserver.port=\$PORT \$JAVA_OPTS --enable-preview -jar target/*.jar" > Procfile
-
-      - name: Install Heroku CLI
-        run: |
-          curl https://cli-assets.heroku.com/install.sh | sh
-
-      - name: Deploy to Heroku
-        uses: akhileshns/heroku-deploy@v3.12.14
+      ###############################################################
+      # (1) Configure AWS via OIDC (for kubectl access)
+      ###############################################################
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
-          heroku_app_name: ${{ secrets.HEROKU_APP_NAME }}
-          heroku_email: ${{ secrets.HEROKU_EMAIL }}
-          procfile: "web: java -Dserver.port=$PORT $JAVA_OPTS --enable-preview -jar target/*.jar"
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Add PostgreSQL Database
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      ###############################################################
+      # (2) Login to Docker Registry
+      ###############################################################
+      - name: Log in to Docker Registry
         run: |
-          # Check if PostgreSQL addon already exists
-          if heroku addons:info heroku-postgresql --app ${{ secrets.HEROKU_APP_NAME }} 2>/dev/null; then
-            echo "PostgreSQL database already exists"
-          else
-            echo "Creating PostgreSQL database..."
-            heroku addons:create heroku-postgresql:essential-0 --app ${{ secrets.HEROKU_APP_NAME }}
-            sleep 10
-          fi
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      - name: Add Redis for Caching
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      ###############################################################
+      # (3) Build & Push Docker Image
+      ###############################################################
+      - name: Build Docker Image
         run: |
-          if heroku addons:info heroku-redis --app ${{ secrets.HEROKU_APP_NAME }} 2>/dev/null; then
-            echo "Redis cache already exists"
-          else
-            echo "Creating Redis cache..."
-            heroku addons:create heroku-redis:mini --app ${{ secrets.HEROKU_APP_NAME }} || \
-            echo "Waiting for Redis provisioning to complete..."
-            sleep 15
-          fi
+          docker build -t nuqta-app .
 
-      - name: Configure Database Connection
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      - name: Tag Docker Image
         run: |
-          # Get and convert DATABASE_URL to JDBC format for Spring Boot
-          DB_URL=$(heroku config:get DATABASE_URL --app ${{ secrets.HEROKU_APP_NAME }})
-          
-          HOST_AND_DB=$(echo "$DB_URL" | sed -E 's|postgres://[^@]+@([^?]+).*|\1|')
-          JDBC_URL="jdbc:postgresql://${HOST_AND_DB}?sslmode=require"
-          
-          DB_USER=$(echo "$DB_URL" | awk -F 'postgres://|:|@' '{print $2}')
-          DB_PASS=$(echo "$DB_URL" | awk -F 'postgres://|:|@' '{print $3}')
-          
-          # Set database connection properties
-          heroku config:set \
-          SPRING_DATASOURCE_URL="$JDBC_URL" \
-          SPRING_DATASOURCE_USERNAME="$DB_USER" \
-          SPRING_DATASOURCE_PASSWORD="$DB_PASS" \
-          --app ${{ secrets.HEROKU_APP_NAME }}
+          docker tag nuqta-app:latest "${{ secrets.DOCKER_REPOSITORY }}:${{ github.sha }}"
 
-      - name: Configure Redis Connection
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      - name: Push Docker Image
         run: |
-          # Get Redis connection details from Heroku
-          REDIS_URL=$(heroku config:get REDIS_URL --app ${{ secrets.HEROKU_APP_NAME }})
-          
-          if [ -n "$REDIS_URL" ]; then
-          
-            heroku config:set \
-            REDIS_URL="$REDIS_URL"\
-            --app ${{ secrets.HEROKU_APP_NAME }}
-          
-            echo "Redis connection configured successfully"
-          else
-            echo "Warning: REDIS_URL not found. Redis configuration skipped."
-          fi
+          docker push "${{ secrets.DOCKER_REPOSITORY }}:${{ github.sha }}"
 
-      - name: Configure Heroku Environment Variables
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-        run: |
-          # Set all environment variables atomically on Heroku app
-          heroku config:set \
-          JAVA_OPTS="-Xmx300m -Xss512k -XX:CICompilerCount=2 --enable-preview" \
-          PORT="8080" \
-          PROFILES_ACTIVE="prod" \
-          MAVEN_OPTS="--enable-preview" \
-          MAIL_USERNAME="${{ secrets.MAIL_USERNAME }}" \
-          MAIL_PASSWORD="${{ secrets.MAIL_PASSWORD }}" \
-          JWT_SECRET_KEY="${{ secrets.JWT_SECRET_KEY }}" \
-          --app ${{ secrets.HEROKU_APP_NAME }}
+      ###############################################################
+      # (4) Configure kubectl for EKS
+      ###############################################################
+      - name: Configure EKS kubectl
+        uses: silverlyra/setup-aws-eks@v0.1
+        with:
+          cluster: ${{ secrets.EKS_CLUSTER }}
+          activate: "true"
 
-      - name: Verify Deployment
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      ###############################################################
+      # (5) Deploy to EKS
+      ###############################################################
+      - name: Deploy to EKS
         run: |
-          echo "Checking application status..."
-          heroku ps --app ${{ secrets.HEROKU_APP_NAME }}
+          sed -i "s#IMAGE_PLACEHOLDER#${{ secrets.DOCKER_REPOSITORY }}:${{ github.sha }}#g" k8s/deployment.yaml
           
-          echo "Checking recent logs..."
-          heroku logs --num 10 --app ${{ secrets.HEROKU_APP_NAME }}
+          kubectl apply -f k8s/
+          kubectl rollout status deployment/nuqta-app -n production --timeout=5m
+
+      ###############################################################
+      # (6) Verify Deployment
+      ###############################################################
+      - name: Verify Pods
+        run: |
+          kubectl get pods -n production
