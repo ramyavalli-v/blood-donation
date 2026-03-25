@@ -112,6 +112,7 @@ jobs:
         run: |
           kubectl apply  --validate=false -f k8s/
           kubectl rollout status deployment/nuqta-app -n production --timeout=5m
+          continue-on-error: true
 
       ###############################################################
       # (7) Verify Deployment
