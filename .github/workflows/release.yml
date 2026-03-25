@@ -1,16 +1,17 @@
+name: Release (Create Docker Image and Push in Docker Hub)
+
 on:
   push:
     tags:
       - "v*"
 
-name: Release (Create Docker Image and Push in Docker Hub)
-
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+
     env:
-      DOCKER_REPO: abdelrahmanmagdii10/nuqta
+      DOCKER_REPO: ramyavalliv/blood-donation-app
 
     steps:
       - name: Checkout code
@@ -18,28 +19,23 @@ jobs:
 
       - name: Docker Login
         env:
-          DOCKER_USERNAME: abdelrahmanmagdii10
-          DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKER_USERNAME: ${{ secrets.PROD_DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.PROD_DOCKERHUB_TOKEN }}
         run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-          echo "${{ secrets.DOCKERHUB_TOKEN }}"
-      ##          docker login -u "abdelrahmanmagdii10" --password-stdin
+          echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
       - name: Build and Tag Docker Image
         run: |
           version=${GITHUB_REF#refs/tags/}
-          if [ "$version" == "$GITHUB_REF" ]; then
-            version=latest
-          fi
           echo "Using version: $version"
 
-          docker build . -t $DOCKER_REPO:$version
+          docker build -t $DOCKER_REPO:$version .
 
       - name: Push Docker Image
         run: |
           version=${GITHUB_REF##*/}
-
           echo "Using version: $version"
 
           docker push $DOCKER_REPO:$version
-          echo "\`docker run -p 3000:3000 $DOCKER_REPO:$version\`" > release
+
+          echo "\`docker run -p 3000:3000 $DOCKER_REPO:$version\`" > release.txt
