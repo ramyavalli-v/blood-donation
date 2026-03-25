@@ -14,7 +14,7 @@ COPY src ./src
 RUN mvn package -DskipTests
 
 # Stage 2: Run the application using a lightweight JDK image
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jdk-alpine
 
 WORKDIR /app
 
