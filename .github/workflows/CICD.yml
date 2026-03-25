@@ -110,7 +110,7 @@ jobs:
       ###############################################################
       - name: Deploy to eks
         run: |
-          kubectl apply  --validate=false  k8s/
+          kubectl apply  --validate=false -f k8s/
           kubectl rollout status deployment/nuqta-app -n production --timeout=5m
 
       ###############################################################
