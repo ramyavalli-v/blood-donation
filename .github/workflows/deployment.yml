@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nuqta-app
+  namespace: production
+  labels:
+    app: nuqta-app
+
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nuqta-app
+
+  template:
+    metadata:
+      labels:
+        app: nuqta-app
+
+    spec:
+      containers:
+        - name: nuqta-app
+          image: IMAGE_PLACEHOLDER
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+
+          # Health checks (recommended for production)
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
