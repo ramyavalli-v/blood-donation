@@ -100,17 +100,21 @@ jobs:
           activate: "true"
 
       ###############################################################
-      # (5) Deploy to EKS
+      # (5) Replace image tag
       ###############################################################
-      - name: Deploy to EKS
+      - name: Replace Image Tag in Deployment YAM
         run: |
           sed -i "s#IMAGE_PLACEHOLDER#${{ secrets.DOCKER_REPOSITORY }}:${{ github.sha }}#g" k8s/deployment.yml
-          
+      ###############################################################
+      # (6) Deploy to EKS
+      ###############################################################
+      - name: Deploy to eks
+        run: |
           kubectl apply -f k8s/
           kubectl rollout status deployment/nuqta-app -n production --timeout=5m
 
       ###############################################################
-      # (6) Verify Deployment
+      # (7) Verify Deployment
       ###############################################################
       - name: Verify Pods
         run: |
