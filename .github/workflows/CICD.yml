@@ -109,6 +109,11 @@ jobs:
       - name: Debug AWS Identity
         run: aws sts get-caller-identity
 
+        
+      - name: Test kubectl access
+        run: kubectl auth can-i get pods -n kube-system
+
+
       ###############################################################
       # (6) Deploy to EKS
       ###############################################################
