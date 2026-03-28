@@ -90,22 +90,7 @@ jobs:
           docker push "${{ secrets.DOCKER_REPOSITORY }}:${{ github.sha }}"
 
       ###############################################################
-      # (4) Configure kubectl for EKS
-      ###############################################################
-      - name: Configure EKS kubectl
-        uses: silverlyra/setup-aws-eks@v0.1
-        with:
-          cluster: ${{ secrets.EKS_CLUSTER }}
-          activate: "true"
-
-      ###############################################################
-      # (5) Replace Image Tag in Deployment YAML
-      ###############################################################
-      - name: Replace Image Tag in Deployment YAML
-        run: |
-          sed -i "s#IMAGE_PLACEHOLDER#${{ secrets.DOCKER_REPOSITORY }}:${{ github.sha }}#g" k8s/deployment.yml
-
-      ###############################################################
+  
       # (6) Configure kubeconfig for EKS
       ###############################################################
       - name: Configure kubeconfig
@@ -114,6 +99,14 @@ jobs:
           EKS_CLUSTER: ${{ secrets.EKS_CLUSTER }}
         run: |
           aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER"
+
+      ###############################################################
+      # (5) Replace Image Tag in Deployment YAML
+      ###############################################################
+      - name: Replace Image Tag in Deployment YAML
+        run: |
+          sed -i "s#IMAGE_PLACEHOLDER#${{ secrets.DOCKER_REPOSITORY }}:${{ github.sha }}#g" k8s/deployment.yml
+
 
       ###############################################################
       # (7) Deploy to EKS
