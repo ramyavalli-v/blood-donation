@@ -105,6 +105,9 @@ jobs:
           EKS_CLUSTER: ${{ secrets.EKS_CLUSTER }}
         run: |
           aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER"
+      
+      - name: Debug AWS Identity
+        run: aws sts get-caller-identity
 
       ###############################################################
       # (6) Deploy to EKS
