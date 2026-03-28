@@ -44,7 +44,6 @@ jobs:
           path: target/*.jar
           retention-days: 1
 
-
   deploy:
     runs-on: ubuntu-latest
     needs: build
@@ -60,7 +59,7 @@ jobs:
           path: target
 
       ###############################################################
-      # (1) Configure AWS via OIDC (for kubectl access)
+      # (1) Configure AWS via OIDC
       ###############################################################
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -100,35 +99,34 @@ jobs:
           activate: "true"
 
       ###############################################################
-      # (5) Replace image tag
+      # (5) Replace Image Tag in Deployment YAML
       ###############################################################
-      - name: Replace Image Tag in Deployment YAM
+      - name: Replace Image Tag in Deployment YAML
         run: |
           sed -i "s#IMAGE_PLACEHOLDER#${{ secrets.DOCKER_REPOSITORY }}:${{ github.sha }}#g" k8s/deployment.yml
+
       ###############################################################
-      # (6) Deploy to EKS
+      # (6) Configure kubeconfig for EKS
       ###############################################################
-      
-       - name: Configure Kubernetes credentials
-         env:
+      - name: Configure kubeconfig
+        env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           EKS_CLUSTER: ${{ secrets.EKS_CLUSTER }}
-
-         run: |
-          aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER"
-           
-    
-      - name: Deploy to eks
         run: |
-          kubectl apply  --validate=false -f k8s/
-          kubectl rollout status deployment/nuqta-app -n production --timeout=5m
-          continue-on-error: true
+          aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER"
 
       ###############################################################
-      # (7) Verify Deployment
+      # (7) Deploy to EKS
+      ###############################################################
+      - name: Deploy to EKS
+        continue-on-error: true
+        run: |
+          kubectl apply --validate=false -f k8s/
+          kubectl rollout status deployment/nuqta-app -n production --timeout=5m
+
+      ###############################################################
+      # (8) Verify Deployment
       ###############################################################
       - name: Verify Pods
         run: |
           kubectl get pods -n production
-
-          
