@@ -109,10 +109,15 @@ jobs:
       # (6) Deploy to EKS
       ###############################################################
       
-      - name: Configure Kubernetes credentials
-        run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+       - name: Configure Kubernetes credentials
+         env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          EKS_CLUSTER: ${{ secrets.EKS_CLUSTER }}
 
-      
+         run: |
+          aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER"
+           
+    
       - name: Deploy to eks
         run: |
           kubectl apply  --validate=false -f k8s/
