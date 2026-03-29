@@ -111,8 +111,9 @@ jobs:
 
         
       - name: Test kubectl access
-        run: kubectl auth can-i get pods -n kube-system
-
+        run: |
+         kubectl auth can-i get pods -n kube-system
+         
 
       ###############################################################
       # (6) Deploy to EKS
