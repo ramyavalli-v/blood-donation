@@ -121,7 +121,7 @@ jobs:
       
       - name: Create namespace
         run: |
-          kubectl create namespace production --dry-run=client -o yaml | kubectl apply -f -
+          kubectl get namespaces
 
       
       - name: Deploy to EKS
