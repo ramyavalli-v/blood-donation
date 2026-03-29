@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: nuqta-app
   namespace: production
+  env:
+      - name: REDIS_URL
+        value: "redis://redis-service:6379"
   labels:
     app: nuqta-app
 
