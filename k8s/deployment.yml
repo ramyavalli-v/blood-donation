@@ -3,9 +3,6 @@ kind: Deployment
 metadata:
   name: nuqta-app
   namespace: production
-  env:
-      - name: REDIS_URL
-        value: "redis://redis-service:6379"
   labels:
     app: nuqta-app
 
@@ -25,10 +22,14 @@ spec:
         - name: nuqta-app
           image: IMAGE_PLACEHOLDER
           imagePullPolicy: Always
+
+          env:
+            - name: REDIS_URL
+              value: "redis://redis-service:6379"
+
           ports:
             - containerPort: 8080
 
-          # Health checks (recommended for production)
           readinessProbe:
             httpGet:
               path: /actuator/health
