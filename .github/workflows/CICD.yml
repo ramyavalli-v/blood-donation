@@ -118,6 +118,12 @@ jobs:
       ###############################################################
       # (6) Deploy to EKS
       ###############################################################
+      
+      - name: Create namespace
+        run: |
+          kubectl create namespace production --dry-run=client -o yaml | kubectl apply -f -
+
+      
       - name: Deploy to EKS
         run: |
           kubectl apply --validate=false -f k8s/
